@@ -1,92 +1,82 @@
-import React, { Component } from 'react';
+import React, { useState } from 'react';
 import { ImageGallery } from './ImageGallery/ImageGallery';
-import Searchbar from './Searchbar/Searchbar';
+import { Searchbar } from './Searchbar/Searchbar';
 import { ButtonMore } from './Button/Button';
 import { fetchImage } from '../services/api';
 import { Loader } from './Loader/Loader';
-import Modal from './Modal/Modal';
+import { Modal } from './Modal/Modal';
+import { useEffect } from 'react';
 
-export class App extends Component {
-  state = {
-    total: null,
-    page: 1,
-    query: '',
-    images: [],
-    error: null,
-    loading: false,
-    largeImg: null,
-  };
+export const App = () => {
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [total, setTotal] = useState(null);
+  const [largeImg, setlargeImg] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  async componentDidUpdate(prevProps, prevState) {
-    try {
-      const { page, query } = this.state;
+  useEffect(() => {
+    if (query === '') {
+      return;
+    }
 
-      if (prevState.query !== query || prevState.page !== page) {
-        this.setState({ loading: true });
-
+    async function fetch(page, query) {
+      try {
+        setLoading(true);
         const data = await fetchImage(page, query);
         const images = data.hits;
+        setImages(prevImages => [...prevImages, ...images]);
+        setTotal(data.totalHits);
 
         if (images.length === 0) {
           alert('Nothing was found for your request');
-          this.setState({ loading: false });
+          setLoading(false);
           return;
         }
 
-        this.setState(prevState => ({
-          total: data.totalHits,
-          images: [...prevState.images, ...images],
-          loading: false,
-          error: null,
-        }));
+        setLoading(false);
+      } catch (error) {
+        setError(error);
       }
-    } catch (error) {
-      this.setState({ error: error });
-      console.log(error);
     }
-  }
+    fetch(page, query);
+    setError(null);
+  }, [page, query]);
 
-  addSearchWord = ({ query }) => {
-    this.setState({ page: 1, query, images: [] });
+  const addSearchWord = query => {
+    setPage(1);
+    setQuery(query);
+    setImages([]);
   };
 
-  addOnePage = () => {
-    if (this.state.page < this.state.total / 12) {
-      this.setState(prevState => ({ page: prevState.page + 1 }));
+  const addOnePage = () => {
+    if (page < total / 12) {
+      setPage(prevPage => prevPage + 1);
     }
   };
 
-  openLargeImg = e => {
+  const openLargeImg = e => {
     const { src } = e.target;
 
-    const image = this.state.images.find(image => {
+    const image = images.find(image => {
       return image.webformatURL === src;
     });
 
-    this.setState({ largeImg: image.largeImageURL });
+    setlargeImg(image.largeImageURL);
   };
 
-  closeModal = () => {
-    this.setState({ largeImg: null });
-  };
+  const closeModal = () => setlargeImg(null);
 
-  render() {
-    const { images, error, loading, largeImg } = this.state;
-    return (
-      <div className="app">
-        {largeImg && <Modal onClick={this.closeModal}>{largeImg}</Modal>}
-        <Searchbar onSubmit={this.addSearchWord} />
-        {error && <span>"Try again later"</span>}
-        {loading && <Loader />}
+  return (
+    <div className="app">
+      {largeImg && <Modal onClick={closeModal}>{largeImg}</Modal>}
+      <Searchbar onSubmit={addSearchWord} />
+      {error && <span>"Try again later"</span>}
+      {loading && <Loader />}
 
-        <ImageGallery
-          onClick={this.openLargeImg}
-          images={images}
-        ></ImageGallery>
-        {images.length > 0 && (
-          <ButtonMore onClick={this.addOnePage}></ButtonMore>
-        )}
-      </div>
-    );
-  }
-}
+      <ImageGallery onClick={openLargeImg} images={images}></ImageGallery>
+      {images.length > 0 && <ButtonMore onClick={addOnePage}></ButtonMore>}
+    </div>
+  );
+};
